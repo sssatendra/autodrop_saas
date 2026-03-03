@@ -1,7 +1,6 @@
 """Catalog API — paginated global product listing."""
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required
-
+from flask_jwt_extended import jwt_required, current_user
 from app.api import api_bp
 from app.models.product import GlobalProduct, ProductStatus
 
@@ -23,6 +22,15 @@ def catalog():
         "pages": pag.pages,
         "page": pag.page,
     }), 200
+
+
+@api_bp.route("/catalog/refresh", methods=["POST"])
+@jwt_required()
+def refresh_catalog():
+    """Manual trigger to run the discovery engine scraper."""
+    from app.tasks import discover_winning_products_task
+    discover_winning_products_task.delay(tenant_id=current_user.tenant_id)
+    return jsonify({"message": "Discovery engine started for your connected suppliers."}), 202
 
 
 def _product_dict(p: GlobalProduct) -> dict:

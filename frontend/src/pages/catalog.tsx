@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, ShoppingBag, TrendingUp, ArrowUpRight, X, Plus } from "lucide-react";
+import { Loader2, Search, ShoppingBag, TrendingUp, ArrowUpRight, X, Plus, RefreshCw, Sparkles } from "lucide-react";
 import api from "@/lib/api";
 
 interface Product {
@@ -83,6 +83,9 @@ function ImportModal({ product, onClose }: { product: Product; onClose: () => vo
 export function CatalogPage() {
     const [search, setSearch] = useState("");
     const [importProduct, setImportProduct] = useState<Product | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const qc = useQueryClient();
+
     const { data, isLoading } = useQuery({
         queryKey: ["catalog", 1],
         queryFn: () => api.get("/catalog?per_page=15").then(r => r.data),
@@ -107,11 +110,34 @@ export function CatalogPage() {
                             onChange={e => setSearch(e.target.value)}
                         />
                     </div>
-                    <div className="hidden sm:flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Filter by ROI</span>
-                        <div className="h-2 w-24 rounded-full bg-slate-100 overflow-hidden">
-                            <div className="h-full w-2/3 bg-emerald-500 rounded-full" />
+                    <div className="flex items-center gap-3">
+                        <div className="hidden sm:flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap">ROI Integrity</span>
+                            <div className="h-2 w-24 rounded-full bg-slate-100 overflow-hidden">
+                                <div className="h-full w-2/3 bg-emerald-500 rounded-full" />
+                            </div>
                         </div>
+                        <Button
+                            variant="outline"
+                            className="h-12 px-5 rounded-2xl border-slate-200 bg-white font-bold text-xs gap-2 shadow-sm transition-all hover:shadow-md hover:bg-slate-50 active:scale-95"
+                            onClick={async () => {
+                                setIsRefreshing(true);
+                                try {
+                                    await api.post("/catalog/refresh");
+                                    // In production, use a toast here
+                                    setTimeout(() => {
+                                        qc.invalidateQueries({ queryKey: ["catalog"] });
+                                        setIsRefreshing(false);
+                                    }, 2000);
+                                } catch (e) {
+                                    setIsRefreshing(false);
+                                }
+                            }}
+                            disabled={isRefreshing}
+                        >
+                            {isRefreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                            Sync Real-time Trends
+                        </Button>
                     </div>
                 </div>
 

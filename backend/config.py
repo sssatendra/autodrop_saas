@@ -42,6 +42,7 @@ class Config:
     # Integrations
     SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY")
     SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET")
+    SHOPIFY_REDIRECT_URI = os.environ.get("SHOPIFY_REDIRECT_URI", "http://localhost:5000/api/v1/stores/shopify/callback")
 
 
 class DevelopmentConfig(Config):

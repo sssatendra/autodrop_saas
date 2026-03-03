@@ -11,3 +11,4 @@ from app.api import orders     # noqa: E402, F401
 from app.api import campaigns  # noqa: E402, F401
 from app.api import billing    # noqa: E402, F401
 from app.api import integrations # noqa: E402, F401
+from app.api import webhooks   # noqa: E402, F401

@@ -5,18 +5,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Store, ExternalLink, CheckCircle2, Plug, X, Loader2, Plus, Zap, ShieldCheck } from "lucide-react";
+import {
+    Store, ShoppingBag, Plus, Loader2, Trash2, ExternalLink,
+    RefreshCcw, ShieldCheck, Plug, AlertCircle, Globe, Zap,
+    Layers, Truck, Search, Briefcase, X
+} from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PLATFORM_LOGOS: Record<string, string> = {
     shopify: "https://cdn.simpleicons.org/shopify/white",
     woocommerce: "https://cdn.simpleicons.org/woocommerce/white",
+    aliexpress: "https://s.yimg.com/zb/imgv1/dda661a9-0f07-3213-89f6-6183da0439fd/t_500x300",
+    cj: "https://www.cjdropshipping.com/wp-content/uploads/2021/04/CJ-logo-2.png", // Placeholder, adjust as needed
 };
 
 interface ConnectedStore {
     id: string;
-    platform: "shopify" | "woocommerce";
+    platform: "shopify" | "woocommerce" | "aliexpress" | "cj";
     store_name: string;
     store_url: string;
     is_active: boolean;
@@ -28,7 +34,7 @@ function ConnectionModal({
     platform,
     onClose,
 }: {
-    platform: "shopify" | "woocommerce";
+    platform: "shopify" | "woocommerce" | "aliexpress" | "cj";
     onClose: () => void;
 }) {
     const qc = useQueryClient();
@@ -38,6 +44,7 @@ function ConnectionModal({
         access_token: "", // for shopify
         consumer_key: "", // for woo
         consumer_secret: "", // for woo
+        api_key: "" // For suppliers
     });
     const [error, setError] = useState("");
 
@@ -51,11 +58,43 @@ function ConnectionModal({
         onError: (e: any) => setError(e.response?.data?.error ?? "Connection failed"),
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const supplierMutation = useMutation({
+        mutationFn: (data: any) => api.post("/integrations/connect", data),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["integrations"] });
+            onClose();
+        },
+        onError: (e: any) => setError(e.response?.data?.error ?? "Connection failed"),
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        mutation.mutate({ platform, ...formData });
+
+        if (platform === "shopify") {
+            try {
+                const shopUrl = formData.store_url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+                const res = await api.get(`/stores/shopify/authorize?shop=${shopUrl}`);
+                if (res.data?.url) {
+                    window.location.href = res.data.url;
+                } else {
+                    setError("Failed to generate authorize URL");
+                }
+            } catch (err: any) {
+                setError(err.response?.data?.error ?? "Authorization failed");
+            }
+        } else if (platform === "aliexpress" || platform === "cj") {
+            // Supplier integrations
+            supplierMutation.mutate({
+                platform,
+                credentials: { api_key: formData.api_key }
+            });
+        } else { // woocommerce
+            mutation.mutate({ platform, ...formData });
+        }
     };
+
+    const isSupplierPlatform = platform === "aliexpress" || platform === "cj";
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-md transition-all duration-300" onClick={onClose}>
@@ -64,11 +103,15 @@ function ConnectionModal({
                 <div className="mb-8 flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 shadow-xl">
-                            <img src={PLATFORM_LOGOS[platform]} alt={platform} className="h-6 w-6" />
+                            {isSupplierPlatform ? (
+                                <img src={PLATFORM_LOGOS[platform]} alt={platform} className="h-6 w-6 object-contain invert dark:invert-0" />
+                            ) : (
+                                <img src={PLATFORM_LOGOS[platform]} alt={platform} className="h-6 w-6" />
+                            )}
                         </div>
                         <div className="text-left">
                             <h3 className="text-xl font-bold tracking-tight capitalize dark:text-white">Connect {platform}</h3>
-                            <p className="text-xs font-medium text-muted-foreground">Link your store to AutoDrop</p>
+                            <p className="text-xs font-medium text-muted-foreground">Link your {isSupplierPlatform ? "supplier account" : "store"} to AutoDrop</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="rounded-full p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -77,40 +120,63 @@ function ConnectionModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-1.5 text-left">
-                        <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Store Name</Label>
-                        <Input
-                            className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
-                            placeholder="e.g. My Premium Shop"
-                            value={formData.store_name}
-                            onChange={(e) => setFormData({ ...formData, store_name: e.target.value })}
-                            required
-                        />
-                    </div>
-                    <div className="space-y-1.5 text-left">
-                        <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Store URL</Label>
-                        <Input
-                            className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
-                            placeholder={platform === "shopify" ? "https://mystore.myshopify.com" : "https://mydomain.com"}
-                            value={formData.store_url}
-                            onChange={(e) => setFormData({ ...formData, store_url: e.target.value })}
-                            required
-                        />
-                    </div>
+                    {!isSupplierPlatform && (
+                        <>
+                            <div className="space-y-1.5 text-left">
+                                <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Store Name</Label>
+                                <Input
+                                    className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
+                                    placeholder="e.g. My Premium Shop"
+                                    value={formData.store_name}
+                                    onChange={(e) => setFormData({ ...formData, store_name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1.5 text-left">
+                                <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Store URL</Label>
+                                <Input
+                                    className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
+                                    placeholder={platform === "shopify" ? "https://mystore.myshopify.com" : "https://mydomain.com"}
+                                    value={formData.store_url}
+                                    onChange={(e) => setFormData({ ...formData, store_url: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        </>
+                    )}
 
                     {platform === "shopify" ? (
-                        <div className="space-y-1.5 text-left">
-                            <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Access Token</Label>
-                            <Input
-                                type="password"
-                                className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
-                                placeholder="shpat_xxxxxxxxxxxxxxxx"
-                                value={formData.access_token}
-                                onChange={(e) => setFormData({ ...formData, access_token: e.target.value })}
-                                required
-                            />
+                        <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-left">
+                            <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                                <ShieldCheck className="h-3.5 w-3.5" /> Secure OAuth 2.0
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                You will be redirected to Shopify to securely authorize AutoDrop. We never see your password.
+                            </p>
                         </div>
-                    ) : (
+                    ) : isSupplierPlatform ? (
+                        <div className="space-y-4">
+                            <div className="space-y-1.5 text-left">
+                                <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">API Key / Access Token</Label>
+                                <Input
+                                    type="password"
+                                    className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900 dark:text-white"
+                                    placeholder="Enter your security token..."
+                                    value={formData.api_key}
+                                    onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="rounded-xl bg-primary/5 border border-primary/10 p-4 text-left">
+                                <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                                    <Globe className="h-3.5 w-3.5" /> High-speed Scraping
+                                </p>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Connecting as a supplier allows AutoDrop to pull real-time inventory and fulfillment updates directly.
+                                </p>
+                            </div>
+                        </div>
+                    ) : ( // woocommerce
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5 text-left">
                                 <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Key</Label>
@@ -138,8 +204,11 @@ function ConnectionModal({
 
                     {error && <p className="rounded-xl border border-destructive/10 bg-destructive/5 p-3 text-center text-xs font-semibold text-destructive">{error}</p>}
 
-                    <Button className="h-12 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]" disabled={mutation.isPending}>
-                        {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Plug className="mr-2 h-4 w-4" /> Connect Platform</>}
+                    <Button
+                        className="h-12 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        disabled={mutation.isPending || supplierMutation.isPending}
+                    >
+                        {(mutation.isPending || supplierMutation.isPending) ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Plug className="mr-2 h-4 w-4" /> {platform === "shopify" ? "Authorize on Shopify" : isSupplierPlatform ? "Configure Integration" : "Connect Platform"}</>}
                     </Button>
                 </form>
             </div>
@@ -210,7 +279,7 @@ export function StoresPage() {
         },
     });
 
-    const [connectPlatform, setConnectPlatform] = useState<"shopify" | "woocommerce" | null>(null);
+    const [connectPlatform, setConnectPlatform] = useState<"shopify" | "woocommerce" | "aliexpress" | "cj" | null>(null);
 
     const stores: ConnectedStore[] = data?.stores ?? [];
 
@@ -248,20 +317,102 @@ export function StoresPage() {
                             <p className="mt-1 text-xs text-muted-foreground">Start by linking a Shopify or WooCommerce store below.</p>
                         </div>
                     ) : (
-                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {stores.map((s) => (
-                                <StoreCard
-                                    key={s.id}
-                                    store={s}
-                                    onDelete={(id) => {
-                                        if (confirm("Disconnect this store? This will stop all product and order syncing.")) {
-                                            deleteMutation.mutate(id);
-                                        }
-                                    }}
-                                />
+                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                            {stores?.map((s: any) => (
+                                <div key={s.id} className="glass-card flex items-center justify-between group transition-all hover:border-primary/40">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all shadow-inner">
+                                            {s.platform === "aliexpress" || s.platform === "cj" ? (
+                                                <img src={PLATFORM_LOGOS[s.platform]} alt={s.platform} className="h-6 w-6 object-contain invert dark:invert-0" />
+                                            ) : (
+                                                <Store className="h-6 w-6" />
+                                            )}
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">{s.store_name || s.platform}</p>
+                                                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none text-[8px] font-black h-4 px-1 uppercase tracking-tighter">Live</Badge>
+                                            </div>
+                                            <p className="text-[10px] font-bold text-muted-foreground/60 flex items-center gap-1 mt-0.5">
+                                                {s.platform.toUpperCase()} {s.store_url && `• ${s.store_url.replace("https://", "")}`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                        {s.store_url && (
+                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => window.open(s.store_url, "_blank")}>
+                                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
+                                        )}
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-destructive/10 hover:text-destructive" onClick={() => deleteMutation.mutate(s.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     )}
+                </div>
+
+                {/* Supplier Network Section */}
+                <div className="mt-12 space-y-6">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                            <Truck className="h-4 w-4" />
+                        </div>
+                        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Supplier Network</h2>
+                        <div className="h-px flex-1 bg-slate-100 dark:bg-white/5" />
+                    </div>
+
+                    <div className="grid gap-6 sm:grid-cols-2">
+                        {/* AliExpress */}
+                        <div className="glass-card hover:border-primary/30 transition-all group relative overflow-hidden bg-white/50 dark:bg-slate-900/50">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 blur-xl group-hover:opacity-30 transition-opacity">
+                                <Zap className="h-16 w-16 text-orange-500" />
+                            </div>
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="flex gap-4">
+                                    <div className="h-14 w-14 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center p-3 shadow-inner">
+                                        <img src={PLATFORM_LOGOS.aliexpress} className="w-full h-full object-contain filter grayscale group-hover:grayscale-0 transition-all" />
+                                    </div>
+                                    <div className="text-left py-1">
+                                        <h3 className="text-base font-bold dark:text-white">AliExpress Global</h3>
+                                        <p className="text-xs text-muted-foreground line-clamp-1">Millions of products, automated fulfillment.</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="rounded-xl h-10 px-4 font-bold text-xs"
+                                    onClick={() => setConnectPlatform("aliexpress")}
+                                >
+                                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Configure
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* CJ Dropshipping */}
+                        <div className="glass-card hover:border-primary/30 transition-all group relative overflow-hidden bg-white/50 dark:bg-slate-900/50">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 blur-xl group-hover:opacity-30 transition-opacity">
+                                <Search className="h-16 w-16 text-blue-500" />
+                            </div>
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className="flex gap-4">
+                                    <div className="h-14 w-14 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center p-4 shadow-inner">
+                                        <div className="text-primary font-black italic text-xl">CJ</div>
+                                    </div>
+                                    <div className="text-left py-1">
+                                        <h3 className="text-base font-bold dark:text-white">CJDropshipping</h3>
+                                        <p className="text-xs text-muted-foreground line-clamp-1">Curated winning items & warehouse stock.</p>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="rounded-xl h-10 px-4 font-bold text-xs"
+                                    onClick={() => setConnectPlatform("cj")}
+                                >
+                                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Configure
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Integration Marketplace */}

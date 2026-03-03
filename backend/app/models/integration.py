@@ -9,6 +9,8 @@ from app.extensions import db
 class IntegrationPlatform(enum.Enum):
     META = "meta"
     GOOGLE = "google"
+    ALIEXPRESS = "aliexpress"
+    CJ = "cj"
 
 
 class TenantIntegration(db.Model):

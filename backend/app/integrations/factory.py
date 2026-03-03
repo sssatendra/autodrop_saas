@@ -4,6 +4,8 @@ from app.integrations.shopify_client import ShopifyClient
 from app.integrations.woocommerce_client import WooCommerceClient
 from app.integrations.meta_ads_client import MetaAdsClient
 from app.integrations.google_ads_client import GoogleAdsClient
+from app.integrations.aliexpress_scraper import AliExpressScraper
+from app.integrations.cj_scraper import CJScraper
 
 class IntegrationFactory:
     """Factory to instantiate integration clients based on platform."""
@@ -36,7 +38,19 @@ class IntegrationFactory:
         elif integration.platform == IntegrationPlatform.GOOGLE:
             return GoogleAdsClient(
                 developer_token=integration.credentials.get("developer_token"),
-                customer_id=integration.credentials.get("customer_id")
+                customer_id=integration.credentials.get("customer_id"),
+                access_token=integration.credentials.get("access_token")
             )
         else:
             raise ValueError(f"Unsupported ads platform: {integration.platform}")
+
+    @staticmethod
+    def get_supplier_client(platform_name: str):
+        """Returns a SupplierClient instance."""
+        p = platform_name.lower()
+        if "aliexpress" in p:
+            return AliExpressScraper()
+        elif "cj" in p:
+            return CJScraper()
+        else:
+            raise ValueError(f"Unsupported supplier: {platform_name}")

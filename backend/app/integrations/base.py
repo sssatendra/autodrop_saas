@@ -29,3 +29,22 @@ class AdsClient(ABC):
     def get_metrics(self, platform_campaign_id: str) -> dict:
         """Fetches performance metrics for a campaign."""
         pass
+
+
+class SupplierClient(ABC):
+    """Abstract base class for Supplier marketplaces (AliExpress, CJ)."""
+
+    @abstractmethod
+    def search_products(self, keyword: str, limit: int = 20) -> list:
+        """Search for products by keyword."""
+        pass
+
+    @abstractmethod
+    def get_trending_products(self) -> list:
+        """Fetch current trending/winning products."""
+        pass
+
+    @abstractmethod
+    def get_product_details(self, platform_id: str) -> dict:
+        """Fetch real-time price and stock for a product."""
+        pass

@@ -16,6 +16,12 @@ def create_app(config_name: str | None = None) -> Flask:
     cors.init_app(app, supports_credentials=True, origins=["http://localhost:5173"])
     jwt.init_app(app)
 
+    @jwt.user_lookup_loader
+    def user_lookup_callback(_jwt_header, jwt_data):
+        from app.models.tenant import User
+        identity = jwt_data["sub"]
+        return User.query.filter_by(id=identity).one_or_none()
+
     # Import models so Alembic can detect them
     from app import models  # noqa: F401
     from app import tasks   # noqa: F401
