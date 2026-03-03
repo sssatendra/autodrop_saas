@@ -69,8 +69,8 @@ class TenantProduct(db.Model):
     tenant = db.relationship("Tenant", back_populates="products")
     store = db.relationship("ConnectedStore", back_populates="products")
     global_product = db.relationship("GlobalProduct", back_populates="tenant_products")
-    campaigns = db.relationship("AdCampaign", back_populates="tenant_product", lazy="dynamic")
-    orders = db.relationship("TenantOrder", back_populates="tenant_product", lazy="dynamic")
+    campaigns = db.relationship("AdCampaign", back_populates="tenant_product", lazy="dynamic", cascade="all, delete-orphan")
+    orders = db.relationship("TenantOrder", back_populates="tenant_product", lazy="dynamic", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<TenantProduct {self.custom_title or self.global_product_id}>"

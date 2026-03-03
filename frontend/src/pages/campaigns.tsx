@@ -110,7 +110,7 @@ function IntegrationModal({ platform, onClose }: { platform: "meta" | "google"; 
                             <div className="space-y-1.5 text-left">
                                 <Label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Customer ID</Label>
                                 <Input
-                                    className="h-11 rounded-xl border-slate-200 bg-slate-50/50 transition-all focus:bg-white"
+                                    className="h-11 rounded-xl border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/50 transition-all focus:bg-white dark:focus:bg-slate-900"
                                     placeholder="123-456-7890"
                                     value={formData.customer_id}
                                     onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
@@ -130,6 +130,7 @@ function IntegrationModal({ platform, onClose }: { platform: "meta" | "google"; 
 }
 
 export function CampaignsPage() {
+    const qc = useQueryClient();
     const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
         queryKey: ["campaigns"],
         queryFn: () => api.get("/campaigns").then(r => r.data),
@@ -138,6 +139,14 @@ export function CampaignsPage() {
     const { data: integrationsData } = useQuery({
         queryKey: ["integrations"],
         queryFn: () => api.get("/integrations").then(r => r.data),
+    });
+
+    const disconnectMutation = useMutation({
+        mutationFn: (platform: string) => api.delete(`/integrations/${platform}`),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["integrations"] });
+            qc.invalidateQueries({ queryKey: ["campaigns"] });
+        },
     });
 
     const [connectPlatform, setConnectPlatform] = useState<"meta" | "google" | null>(null);
@@ -159,7 +168,7 @@ export function CampaignsPage() {
                                 <DollarSign className="h-4 w-4" />
                             </div>
                         </div>
-                        <div className="text-3xl font-bold tracking-tight">${metrics.total_spend.toFixed(2)}</div>
+                        <div className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">${metrics.total_spend.toFixed(2)}</div>
                         <p className="text-[10px] font-medium text-muted-foreground mt-2">Aggregated investment</p>
                     </div>
 
@@ -193,9 +202,24 @@ export function CampaignsPage() {
                                     </div>
                                 </div>
                                 {connected ? (
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/10 text-[9px] font-bold px-2 h-5 rounded-md">
-                                        READY
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/10 text-[9px] font-bold px-2 h-5 rounded-md">
+                                            READY
+                                        </Badge>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => {
+                                                if (confirm(`Disconnect ${p} Ads?`)) {
+                                                    disconnectMutation.mutate(p);
+                                                }
+                                            }}
+                                            disabled={disconnectMutation.isPending}
+                                        >
+                                            {disconnectMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                                        </Button>
+                                    </div>
                                 ) : (
                                     <Button size="sm" variant="outline" className="h-8 rounded-lg px-3 text-[11px] font-bold border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => setConnectPlatform(p)}>
                                         <Plus className="h-3 w-3 mr-1.5" /> Link Channel
@@ -209,7 +233,7 @@ export function CampaignsPage() {
                 {/* Campaigns table */}
                 <div className="glass-card overflow-hidden !p-0">
                     <div className="px-8 py-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
-                        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-800 flex items-center gap-2">
+                        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-800 dark:text-white flex items-center gap-2">
                             <Megaphone className="h-4 w-4 text-primary" /> Active Campaigns
                         </h2>
                         <Button size="sm" className="rounded-xl h-9 px-4 font-bold shadow-lg shadow-primary/20" disabled={integrations.length === 0}>

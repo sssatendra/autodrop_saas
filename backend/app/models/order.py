@@ -47,7 +47,7 @@ class TenantOrder(db.Model):
     tenant = db.relationship("Tenant", back_populates="orders")
     store = db.relationship("ConnectedStore", back_populates="orders")
     tenant_product = db.relationship("TenantProduct", back_populates="orders")
-    fulfillment = db.relationship("Fulfillment", back_populates="order", uselist=False)
+    fulfillment = db.relationship("Fulfillment", back_populates="order", uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<TenantOrder {self.id} - {self.status.value}>"

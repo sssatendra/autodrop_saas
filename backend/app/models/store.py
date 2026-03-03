@@ -33,8 +33,8 @@ class ConnectedStore(db.Model):
     )
 
     tenant = db.relationship("Tenant", back_populates="stores")
-    products = db.relationship("TenantProduct", back_populates="store", lazy="dynamic")
-    orders = db.relationship("TenantOrder", back_populates="store", lazy="dynamic")
+    products = db.relationship("TenantProduct", back_populates="store", lazy="dynamic", cascade="all, delete-orphan")
+    orders = db.relationship("TenantOrder", back_populates="store", lazy="dynamic", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<ConnectedStore {self.store_name} ({self.platform.value})>"
